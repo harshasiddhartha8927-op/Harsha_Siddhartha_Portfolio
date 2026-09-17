@@ -1,0 +1,100 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  background-color: #0C0C0C;
+  color: #D7E2EA;
+  font-family: 'Kanit', sans-serif;
+  overflow-x: clip;
+  width: 100%;
+}
+
+.hero-heading {
+  background: linear-gradient(180deg, #646973 0%, #BBCCD7 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Custom scrollbar styling for extra polish */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0A0A0C;
+}
+::-webkit-scrollbar-thumb {
+  background: #262730;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #B600A8;
+}
+
+/* Glassmorphism & Admin Glow Utilities */
+.admin-card {
+  background: rgba(18, 18, 22, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+.admin-card-glow {
+  position: relative;
+  background: rgba(18, 18, 22, 0.85);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(182, 0, 168, 0.2);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.admin-card-glow:hover {
+  border-color: rgba(182, 0, 168, 0.5);
+  box-shadow: 0 0 25px -5px rgba(182, 0, 168, 0.25);
+  transform: translateY(-2px);
+}
+
+/* LED Indicator Glow */
+.led-pulse-green {
+  box-shadow: 0 0 8px #10B981, 0 0 16px rgba(16, 185, 129, 0.4);
+  animation: ledPulse 2s infinite;
+}
+
+.led-pulse-amber {
+  box-shadow: 0 0 8px #F59E0B, 0 0 16px rgba(245, 158, 11, 0.4);
+  animation: ledPulse 2s infinite;
+}
+
+.led-pulse-magenta {
+  box-shadow: 0 0 8px #B600A8, 0 0 16px rgba(182, 0, 168, 0.5);
+  animation: ledPulse 2s infinite;
+}
+
+@keyframes ledPulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.65;
+    transform: scale(0.92);
+  }
+}
+
+/* Ambient Grid Background */
+.admin-bg-grid {
+  background-size: 40px 40px;
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+}
+
