@@ -24,7 +24,7 @@ const INITIAL_SKILLS: Skill[] = [
   { id: 'sk-8', name: 'LLMs & Prompting', category: 'AI', level: 'Specialized', featured: true },
   { id: 'sk-9', name: 'LangChain & PyTorch', category: 'AI', level: 'Intermediate', featured: true },
   { id: 'sk-10', name: 'Web Development', category: 'Development', level: 'Advanced', featured: true },
-  { id: 'sk-[#sk-11]', name: 'Git & GitHub Workflow', category: 'Development', level: 'Advanced', featured: true },
+  { id: 'sk-11', name: 'Git & GitHub Workflow', category: 'Development', level: 'Advanced', featured: true },
   { id: 'sk-12', name: 'System Design Basics', category: 'Development', level: 'Intermediate', featured: true },
 ];
 
@@ -265,7 +265,12 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       try {
         const res = await fetch('/api/admin/session', { credentials: 'same-origin' });
         if (res.ok) {
-          const data = await res.json();
+          let data: any = {};
+          try {
+            data = await res.json();
+          } catch {
+            data = {};
+          }
           if (mounted) {
             setIsAuthenticated(!!data.authenticated);
           }
@@ -324,7 +329,12 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         body: JSON.stringify({ username, password }),
       });
 
-      const data = await res.json();
+      let data: any = {};
+      try {
+        data = await res.json();
+      } catch {
+        data = {};
+      }
 
       if (res.ok && data.success) {
         setIsAuthenticated(true);
