@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'http';
-import { clearSessionCookie } from './authHelper';
+import { clearSessionCookie } from './authHelper.js';
 
 export default async function handler(req: IncomingMessage, res: ServerResponse) {
   if (req.method !== 'POST' && req.method !== 'GET') {

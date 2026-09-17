@@ -3,7 +3,7 @@ import {
   verifyAdminCredentials,
   createSessionToken,
   setSessionCookie,
-} from './authHelper';
+} from './authHelper.js';
 
 export default async function handler(req: IncomingMessage & { body?: any }, res: ServerResponse & { status?: any, json?: any }) {
   // Allow POST only
