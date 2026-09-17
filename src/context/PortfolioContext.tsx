@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { Project, Skill, Service, AboutInfo, ContactInfo } from '../types/portfolio';
 
 const INITIAL_ABOUT: AboutInfo = {
@@ -203,23 +203,25 @@ interface PortfolioContextType {
   contact: ContactInfo;
   isAuthenticated: boolean;
   isAuthLoading: boolean;
+  isDataLoading: boolean;
   login: (username?: string, password?: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
-  updateAbout: (newAbout: Partial<AboutInfo>) => void;
-  updateContact: (newContact: Partial<ContactInfo>) => void;
-  addSkill: (skill: Omit<Skill, 'id'>) => void;
-  updateSkill: (id: string, skill: Partial<Skill>) => void;
-  deleteSkill: (id: string) => void;
-  addService: (service: Omit<Service, 'id'>) => void;
-  updateService: (id: string, service: Partial<Service>) => void;
-  deleteService: (id: string) => void;
-  toggleServiceStatus: (id: string) => void;
-  moveServiceOrder: (id: string, direction: 'up' | 'down') => void;
-  addProject: (project: Omit<Project, 'id' | 'createdAt'>) => void;
-  updateProject: (id: string, project: Partial<Project>) => void;
-  deleteProject: (id: string) => void;
-  toggleProjectStatus: (id: string) => void;
-  toggleProjectFeatured: (id: string) => void;
+  updateAbout: (newAbout: Partial<AboutInfo>) => Promise<void>;
+  updateContact: (newContact: Partial<ContactInfo>) => Promise<void>;
+  addSkill: (skill: Omit<Skill, 'id'>) => Promise<void>;
+  updateSkill: (id: string, skill: Partial<Skill>) => Promise<void>;
+  deleteSkill: (id: string) => Promise<void>;
+  addService: (service: Omit<Service, 'id'>) => Promise<void>;
+  updateService: (id: string, service: Partial<Service>) => Promise<void>;
+  deleteService: (id: string) => Promise<void>;
+  toggleServiceStatus: (id: string) => Promise<void>;
+  moveServiceOrder: (id: string, direction: 'up' | 'down') => Promise<void>;
+  addProject: (project: Omit<Project, 'id' | 'createdAt'>) => Promise<void>;
+  updateProject: (id: string, project: Partial<Project>) => Promise<void>;
+  deleteProject: (id: string) => Promise<void>;
+  toggleProjectStatus: (id: string) => Promise<void>;
+  toggleProjectFeatured: (id: string) => Promise<void>;
+  refreshPortfolioData: () => Promise<void>;
 }
 
 const PortfolioContext = createContext<PortfolioContextType | undefined>(undefined);
@@ -252,13 +254,58 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
+  const [isDataLoading, setIsDataLoading] = useState<boolean>(true);
 
-  // Remove legacy insecure auth flag from localStorage if present
-  useEffect(() => {
-    localStorage.removeItem('harsha_portfolio_auth');
+  // Fetch live portfolio data from single source of truth database API
+  const refreshPortfolioData = useCallback(async () => {
+    try {
+      const res = await fetch('/api/portfolio', { cache: 'no-store' });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.data) {
+          const { about: apiAbout, skills: apiSkills, services: apiServices, projects: apiProjects, contact: apiContact } = json.data;
+          if (apiAbout) setAbout(apiAbout);
+          if (apiSkills) setSkills(apiSkills);
+          if (apiServices) setServices(apiServices);
+          if (apiProjects) setProjects(apiProjects);
+          if (apiContact) setContact(apiContact);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load portfolio data from database API:', err);
+    } finally {
+      setIsDataLoading(false);
+    }
   }, []);
 
-  // Check server session on mount
+  // Remove legacy auth keys & fetch live DB data on mount
+  useEffect(() => {
+    localStorage.removeItem('harsha_portfolio_auth');
+    refreshPortfolioData();
+  }, [refreshPortfolioData]);
+
+  // Sync to local storage as secondary backup
+  useEffect(() => {
+    localStorage.setItem('harsha_portfolio_about', JSON.stringify(about));
+  }, [about]);
+
+  useEffect(() => {
+    localStorage.setItem('harsha_portfolio_skills', JSON.stringify(skills));
+  }, [skills]);
+
+  useEffect(() => {
+    localStorage.setItem('harsha_portfolio_services', JSON.stringify(services));
+  }, [services]);
+
+  useEffect(() => {
+    localStorage.setItem('harsha_portfolio_projects', JSON.stringify(projects));
+  }, [projects]);
+
+  useEffect(() => {
+    localStorage.setItem('harsha_portfolio_contact', JSON.stringify(contact));
+  }, [contact]);
+
+  // Check admin session on mount
   useEffect(() => {
     let mounted = true;
     const checkSession = async () => {
@@ -297,25 +344,29 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     };
   }, []);
 
-  useEffect(() => {
-    localStorage.setItem('harsha_portfolio_about', JSON.stringify(about));
-  }, [about]);
+  // Helper method to sync updated portfolio state to persistent database API
+  const saveToDatabase = async (payload: {
+    about?: AboutInfo;
+    skills?: Skill[];
+    services?: Service[];
+    projects?: Project[];
+    contact?: ContactInfo;
+  }) => {
+    try {
+      const res = await fetch('/api/admin/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify(payload),
+      });
 
-  useEffect(() => {
-    localStorage.setItem('harsha_portfolio_skills', JSON.stringify(skills));
-  }, [skills]);
-
-  useEffect(() => {
-    localStorage.setItem('harsha_portfolio_services', JSON.stringify(services));
-  }, [services]);
-
-  useEffect(() => {
-    localStorage.setItem('harsha_portfolio_projects', JSON.stringify(projects));
-  }, [projects]);
-
-  useEffect(() => {
-    localStorage.setItem('harsha_portfolio_contact', JSON.stringify(contact));
-  }, [contact]);
+      if (!res.ok) {
+        console.error('Database save failed with HTTP status:', res.status);
+      }
+    } catch (err) {
+      console.error('Failed to persist portfolio data to server database:', err);
+    }
+  };
 
   const login = async (usernameArg?: string, passwordArg?: string) => {
     try {
@@ -363,99 +414,120 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   };
 
-  const updateAbout = (newAbout: Partial<AboutInfo>) => {
-    setAbout((prev) => ({ ...prev, ...newAbout }));
+  const updateAbout = async (newAbout: Partial<AboutInfo>) => {
+    const updated = { ...about, ...newAbout };
+    setAbout(updated);
+    await saveToDatabase({ about: updated, skills, services, projects, contact });
   };
 
-  const updateContact = (newContact: Partial<ContactInfo>) => {
-    setContact((prev) => ({ ...prev, ...newContact }));
+  const updateContact = async (newContact: Partial<ContactInfo>) => {
+    const updated = { ...contact, ...newContact };
+    setContact(updated);
+    await saveToDatabase({ about, skills, services, projects, contact: updated });
   };
 
-  const addSkill = (skillData: Omit<Skill, 'id'>) => {
+  const addSkill = async (skillData: Omit<Skill, 'id'>) => {
     const newSkill: Skill = {
       ...skillData,
       id: `sk-${Date.now()}`,
     };
-    setSkills((prev) => [...prev, newSkill]);
+    const updated = [...skills, newSkill];
+    setSkills(updated);
+    await saveToDatabase({ about, skills: updated, services, projects, contact });
   };
 
-  const updateSkill = (id: string, skillData: Partial<Skill>) => {
-    setSkills((prev) => prev.map((s) => (s.id === id ? { ...s, ...skillData } : s)));
+  const updateSkill = async (id: string, skillData: Partial<Skill>) => {
+    const updated = skills.map((s) => (s.id === id ? { ...s, ...skillData } : s));
+    setSkills(updated);
+    await saveToDatabase({ about, skills: updated, services, projects, contact });
   };
 
-  const deleteSkill = (id: string) => {
-    setSkills((prev) => prev.filter((s) => s.id !== id));
+  const deleteSkill = async (id: string) => {
+    const updated = skills.filter((s) => s.id !== id);
+    setSkills(updated);
+    await saveToDatabase({ about, skills: updated, services, projects, contact });
   };
 
-  const addService = (serviceData: Omit<Service, 'id'>) => {
+  const addService = async (serviceData: Omit<Service, 'id'>) => {
     const newService: Service = {
       ...serviceData,
       id: `srv-${Date.now()}`,
       status: serviceData.status || 'published',
       order: services.length + 1,
     };
-    setServices((prev) => [...prev, newService]);
+    const updated = [...services, newService];
+    setServices(updated);
+    await saveToDatabase({ about, skills, services: updated, projects, contact });
   };
 
-  const updateService = (id: string, serviceData: Partial<Service>) => {
-    setServices((prev) => prev.map((s) => (s.id === id ? { ...s, ...serviceData } : s)));
+  const updateService = async (id: string, serviceData: Partial<Service>) => {
+    const updated = services.map((s) => (s.id === id ? { ...s, ...serviceData } : s));
+    setServices(updated);
+    await saveToDatabase({ about, skills, services: updated, projects, contact });
   };
 
-  const deleteService = (id: string) => {
-    setServices((prev) => prev.filter((s) => s.id !== id));
+  const deleteService = async (id: string) => {
+    const updated = services.filter((s) => s.id !== id);
+    setServices(updated);
+    await saveToDatabase({ about, skills, services: updated, projects, contact });
   };
 
-  const toggleServiceStatus = (id: string) => {
-    setServices((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, status: s.status === 'published' ? 'draft' : 'published' } : s))
-    );
+  const toggleServiceStatus = async (id: string) => {
+    const updated: Service[] = services.map((s) => (s.id === id ? { ...s, status: (s.status === 'published' ? 'draft' : 'published') as 'published' | 'draft' } : s));
+    setServices(updated);
+    await saveToDatabase({ about, skills, services: updated, projects, contact });
   };
 
-  const moveServiceOrder = (id: string, direction: 'up' | 'down') => {
-    setServices((prev) => {
-      const index = prev.findIndex((s) => s.id === id);
-      if (index < 0) return prev;
-      const targetIndex = direction === 'up' ? index - 1 : index + 1;
-      if (targetIndex < 0 || targetIndex >= prev.length) return prev;
-      const updated = [...prev];
-      const temp = updated[index];
-      updated[index] = updated[targetIndex];
-      updated[targetIndex] = temp;
-      return updated;
-    });
+  const moveServiceOrder = async (id: string, direction: 'up' | 'down') => {
+    const index = services.findIndex((s) => s.id === id);
+    if (index < 0) return;
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= services.length) return;
+    const updated = [...services];
+    const temp = updated[index];
+    updated[index] = updated[targetIndex];
+    updated[targetIndex] = temp;
+    setServices(updated);
+    await saveToDatabase({ about, skills, services: updated, projects, contact });
   };
 
-  const addProject = (projectData: Omit<Project, 'id' | 'createdAt'>) => {
+  const addProject = async (projectData: Omit<Project, 'id' | 'createdAt'>) => {
     const newProj: Project = {
       ...projectData,
       id: `proj-${Date.now()}`,
       createdAt: new Date().toISOString().split('T')[0],
     };
-    setProjects((prev) => [newProj, ...prev]);
+    const updated = [newProj, ...projects];
+    setProjects(updated);
+    await saveToDatabase({ about, skills, services, projects: updated, contact });
   };
 
-  const updateProject = (id: string, projectData: Partial<Project>) => {
-    setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, ...projectData } : p)));
+  const updateProject = async (id: string, projectData: Partial<Project>) => {
+    const updated = projects.map((p) => (p.id === id ? { ...p, ...projectData } : p));
+    setProjects(updated);
+    await saveToDatabase({ about, skills, services, projects: updated, contact });
   };
 
-  const deleteProject = (id: string) => {
-    setProjects((prev) => prev.filter((p) => p.id !== id));
+  const deleteProject = async (id: string) => {
+    const updated = projects.filter((p) => p.id !== id);
+    setProjects(updated);
+    await saveToDatabase({ about, skills, services, projects: updated, contact });
   };
 
-  const toggleProjectStatus = (id: string) => {
-    setProjects((prev) =>
-      prev.map((p) =>
-        p.id === id
-          ? { ...p, status: p.status === 'published' ? 'draft' : 'published' }
-          : p
-      )
+  const toggleProjectStatus = async (id: string) => {
+    const updated: Project[] = projects.map((p) =>
+      p.id === id
+        ? { ...p, status: (p.status === 'published' ? 'draft' : 'published') as 'published' | 'draft' }
+        : p
     );
+    setProjects(updated);
+    await saveToDatabase({ about, skills, services, projects: updated, contact });
   };
 
-  const toggleProjectFeatured = (id: string) => {
-    setProjects((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, featured: !p.featured } : p))
-    );
+  const toggleProjectFeatured = async (id: string) => {
+    const updated = projects.map((p) => (p.id === id ? { ...p, featured: !p.featured } : p));
+    setProjects(updated);
+    await saveToDatabase({ about, skills, services, projects: updated, contact });
   };
 
   return (
@@ -468,6 +540,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         contact,
         isAuthenticated,
         isAuthLoading,
+        isDataLoading,
         login,
         logout,
         updateAbout,
@@ -485,6 +558,7 @@ export const PortfolioProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         deleteProject,
         toggleProjectStatus,
         toggleProjectFeatured,
+        refreshPortfolioData,
       }}
     >
       {children}
